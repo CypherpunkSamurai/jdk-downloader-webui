@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>JDK Download Wizard</title>
+	<script src="https://cdn.tailwindcss.com"></script>
+	<style>
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
+			background-color: #1c1c1e;
+			color: #f5f5f7;
+			margin: 0;
+			padding: 0;
+		}
+
+		/* macOS Glassmorphism */
+		.glass-panel {
+			background: rgba(42, 42, 46, 0.7);
+			backdrop-filter: blur(20px);
+			-webkit-backdrop-filter: blur(20px);
+			border: 1px solid rgba(88, 88, 96, 0.2);
+			box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+		}
+
+		/* Basic transition for steps */
+		.step-container {
+			opacity: 0;
+			transform: translateY(15px);
+			transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+			max-height: 0;
+			overflow: hidden;
+			position: absolute;
+			width: 100%;
+			left: 0;
+			visibility: hidden;
+		}
+
+		.step-container.active {
+			opacity: 1;
+			transform: translateY(0);
+			max-height: 1000px;
+			position: relative;
+			visibility: visible;
+		}
+
+		/* macOS Button Style */
+		.macos-button {
+			background: linear-gradient(180deg, #0071e3, #0077ed);
+			border-radius: 8px;
+			color: white;
+			font-weight: 500;
+			padding: 8px 16px;
+			transition: all 0.2s ease;
+			border: none;
+			outline: none;
+			box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+			text-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+		}
+
+		.macos-button:hover {
+			background: linear-gradient(180deg, #0077ed, #0082fc);
+			transform: translateY(-1px);
+			box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+		}
+
+		.macos-button:active {
+			background: linear-gradient(180deg, #006edb, #0071e3);
+			transform: translateY(0);
+			box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+		}
+
+		.macos-button-secondary {
+			background: linear-gradient(180deg, rgba(110, 110, 115, 0.5), rgba(100, 100, 105, 0.5));
+			color: #f5f5f7;
+			border: 1px solid rgba(130, 130, 140, 0.2);
+		}
+
+		.macos-button-secondary:hover {
+			background: linear-gradient(180deg, rgba(120, 120, 125, 0.5), rgba(110, 110, 115, 0.5));
+		}
+
+		.macos-button-secondary:active {
+			background: linear-gradient(180deg, rgba(100, 100, 105, 0.5), rgba(110, 110, 115, 0.5));
+		}
+
+		.macos-button-download {
+			background: linear-gradient(180deg, #34c759, #30b850);
+		}
+
+		.macos-button-download:hover {
+			background: linear-gradient(180deg, #36d75e, #34c759);
+		}
+
+		.macos-button-download:active {
+			background: linear-gradient(180deg, #30b850, #2da549);
+		}
+
+		/* Loading Spinner */
+		.loader {
+			border: 3px solid rgba(255, 255, 255, 0.1);
+			border-top: 3px solid #0071e3;
+			border-radius: 50%;
+			width: 24px;
+			height: 24px;
+			animation: spin 1s linear infinite;
+			margin: 20px auto;
+		}
+
+		@keyframes spin {
+			0% {
+				transform: rotate(0deg);
+			}
+
+			100% {
+				transform: rotate(360deg);
+			}
+		}
+
+		/* Ensure container adjusts height based on active step */
+		#wizard-steps-wrapper {
+			position: relative;
+			min-height: 200px;
+		}
+
+		/* Custom scrollbar for versions list */
+		.macos-scrollbar::-webkit-scrollbar {
+			width: 8px;
+			height: 8px;
+		}
+
+		.macos-scrollbar::-webkit-scrollbar-track {
+			background: rgba(70, 70, 78, 0.2);
+			border-radius: 10px;
+		}
+
+		.macos-scrollbar::-webkit-scrollbar-thumb {
+			background: rgba(150, 150, 170, 0.4);
+			border-radius: 10px;
+		}
+
+		.macos-scrollbar::-webkit-scrollbar-thumb:hover {
+			background: rgba(150, 150, 170, 0.6);
+		}
+
+		/* macOS style focused inputs */
+		.macos-focus:focus {
+			outline: none;
+			box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.5);
+		}
+
+		/* macOS style title bar */
+		.title-bar {
+			border-top-left-radius: 12px;
+			border-top-right-radius: 12px;
+			border-bottom: 1px solid rgba(88, 88, 96, 0.3);
+			background: rgba(50, 50, 56, 0.5);
+		}
+
+		/* macOS style window buttons */
+		.window-button {
+			width: 12px;
+			height: 12px;
+			border-radius: 50%;
+			margin-right: 8px;
+		}
+
+		.close-button {
+			background-color: #ff5f57;
+		}
+
+		.minimize-button {
+			background-color: #febc2e;
+		}
+
+		.maximize-button {
+			background-color: #28c840;
+		}
+
+		/* macOS style selection options */
+		.option-card {
+			background: rgba(55, 55, 60, 0.5);
+			border: 1px solid rgba(88, 88, 96, 0.3);
+			border-radius: 8px;
+			transition: all 0.2s ease;
+		}
+
+		.option-card:hover {
+			background: rgba(65, 65, 70, 0.6);
+			transform: translateY(-2px);
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		}
+
+		.option-card.selected {
+			background: rgba(0, 113, 227, 0.2);
+			border: 1px solid rgba(0, 113, 227, 0.5);
+			box-shadow: 0 0 8px rgba(0, 113, 227, 0.3);
+		}
+
+		/* macOS subtle link style */
+		.macos-link {
+			color: #0071e3;
+			text-decoration: none;
+			transition: all 0.2s ease;
+		}
+
+		.macos-link:hover {
+			color: #0082fc;
+			text-decoration: underline;
+		}
+
+		/* macOS style summary card */
+		.summary-card {
+			background: rgba(50, 50, 56, 0.5);
+			border: 1px solid rgba(88, 88, 96, 0.3);
+			border-radius: 10px;
+		}
+
+		/* Subtle animation for progress indicators */
+		.step-indicator {
+			transition: all 0.3s ease;
+		}
+
+		.step-indicator.active {
+			background-color: #0071e3;
+			transform: scale(1.2);
+		}
+	</style>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4">
+	<!-- macOS Dynamic Background with subtle animation -->
+	<div class="fixed inset-0 bg-gradient-to-br from-[#252529] via-[#1c1c1e] to-[#28282c] z-0"></div>
+	<div class="fixed inset-0 opacity-30 z-0 overflow-hidden">
+		<div
+			class="absolute -inset-[10%] bg-[radial-gradient(circle_at_50%_50%,rgba(66,66,74,0.3)_0%,rgba(28,28,30,0)_50%)] animate-pulse">
+		</div>
+	</div>
+
+	<div class="glass-panel rounded-xl w-full max-w-2xl z-10 overflow-hidden">
+		<!-- macOS title bar -->
+		<div class="title-bar py-3 px-4 flex items-center">
+			<div class="flex space-x-2">
+				<div class="window-button close-button"></div>
+				<div class="window-button minimize-button"></div>
+				<div class="window-button maximize-button"></div>
+			</div>
+			<div class="flex-grow text-center text-sm font-medium text-gray-300">JDK Download Wizard</div>
+			<div class="w-16"></div> <!-- Spacer for centering -->
+		</div>
+
+		<div class="p-8">
+			<h1 class="text-2xl font-semibold text-center text-white mb-8">Choose Your JDK</h1>
+
+			<!-- Progress indicators -->
+			<div class="flex justify-center mb-8 space-x-2">
+				<div id="step-indicator-0" class="step-indicator w-2 h-2 bg-gray-500 rounded-full"></div>
+				<div id="step-indicator-1" class="step-indicator w-2 h-2 bg-gray-500 rounded-full"></div>
+				<div id="step-indicator-2" class="step-indicator w-2 h-2 bg-gray-500 rounded-full"></div>
+				<div id="step-indicator-3" class="step-indicator w-2 h-2 bg-gray-500 rounded-full"></div>
+				<div id="step-indicator-4" class="step-indicator w-2 h-2 bg-gray-500 rounded-full"></div>
+			</div>
+
+			<div id="wizard-container">
+				<!-- Loading Indicator -->
+				<div id="loading-indicator" class="text-center py-10">
+					<div class="loader"></div>
+					<p class="text-gray-400 mt-3 text-sm">Fetching JDK options...</p>
+				</div>
+
+				<!-- Error Message Area -->
+				<div id="error-message"
+					class="hidden text-center text-[#ff453a] font-medium my-4 p-4 bg-[rgba(255,69,58,0.1)] rounded-lg border border-[rgba(255,69,58,0.3)]">
+					<!-- Error content here -->
+				</div>
+
+				<!-- Wrapper for steps to manage height/transitions -->
+				<div id="wizard-steps-wrapper">
+					<!-- Step 1: OS -->
+					<div id="step-0" class="step-container">
+						<h2 class="text-xl font-medium text-gray-200 mb-6 text-center">Select your Operating System</h2>
+						<div id="os-options" class="flex flex-wrap justify-center gap-4 min-h-[60px]">
+							<!-- OS options will be populated here -->
+						</div>
+					</div>
+
+					<!-- Step 2: Architecture -->
+					<div id="step-1" class="step-container">
+						<h2 class="text-xl font-medium text-gray-200 mb-6 text-center">Select your Architecture</h2>
+						<div id="arch-options" class="flex flex-wrap justify-center gap-4 min-h-[60px]">
+							<!-- Arch options will be populated here -->
+						</div>
+						<button onclick="goBack(0)" class="mt-8 block mx-auto text-sm text-gray-400 hover:text-gray-200 focus:outline-none macos-focus flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                            </svg>
+                            Back to OS
+                        </button>
+					</div>
+
+					<!-- Step 3: Distribution -->
+					<div id="step-2" class="step-container">
+						<h2 class="text-xl font-medium text-gray-200 mb-6 text-center">Choose a JDK Distribution</h2>
+						<div id="dist-options" class="flex flex-wrap justify-center gap-4 min-h-[60px]">
+							<!-- Dist options will be populated here -->
+						</div>
+						<button onclick="goBack(1)" class="mt-8 block mx-auto text-sm text-gray-400 hover:text-gray-200 focus:outline-none macos-focus flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                            </svg>
+                            Back to Architecture
+                        </button>
+					</div>
+
+					<!-- Step 4: Version -->
+					<div id="step-3" class="step-container">
+						<h2 class="text-xl font-medium text-gray-200 mb-6 text-center">Select the JDK Version</h2>
+						<div id="version-options"
+							class="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-60 overflow-y-auto p-3 rounded-lg bg-[rgba(55,55,60,0.5)] min-h-[60px] macos-scrollbar">
+							<!-- Version options will be populated here -->
+						</div>
+						<button onclick="goBack(2)" class="mt-8 block mx-auto text-sm text-gray-400 hover:text-gray-200 focus:outline-none macos-focus flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                            </svg>
+                            Back to Distribution
+                        </button>
+					</div>
+
+					<!-- Step 5: Download -->
+					<div id="step-4" class="step-container text-center">
+						<h2 class="text-2xl font-medium text-[#34c759] mb-5">Ready to Download</h2>
+						<div class="summary-card p-5 mb-6 text-left text-sm space-y-3">
+							<p class="flex">
+								<span class="font-medium text-gray-400 w-28">OS:</span>
+								<span id="summary-os" class="text-gray-200"></span>
+							</p>
+							<p class="flex">
+								<span class="font-medium text-gray-400 w-28">Architecture:</span>
+								<span id="summary-arch" class="text-gray-200"></span>
+							</p>
+							<p class="flex">
+								<span class="font-medium text-gray-400 w-28">Distribution:</span>
+								<span id="summary-dist" class="text-gray-200"></span>
+							</p>
+							<p class="flex">
+								<span class="font-medium text-gray-400 w-28">Version:</span>
+								<span id="summary-version" class="text-gray-200"></span>
+							</p>
+						</div>
+						<a id="download-link" href="#" target="_blank" rel="noopener noreferrer"
+							class="inline-block macos-button macos-button-download py-3 px-6 rounded-lg text-base no-underline">
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1 -mt-0.5"
+								viewBox="0 0 20 20" fill="currentColor">
+								<path fill-rule="evenodd"
+									d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+									clip-rule="evenodd" />
+							</svg>
+							Download JDK
+						</a>
+						<button onclick="goBack(3)" class="mt-8 block mx-auto text-sm text-gray-400 hover:text-gray-200 focus:outline-none macos-focus flex items-center justify-center mx-auto">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                            </svg>
+                            Back to Version
+                        </button>
+					</div>
+				</div>
+			</div>
+			<footer class="text-center text-xs text-gray-500 mt-10">
+				JDK data from <a href="https://github.com/shyiko/jabba" target="_blank" class="macos-link">Jabba
+					Index</a>
+			</footer>
+		</div>
+	</div>
+
+	<script>
+		const jdkDataUrl = 'https://raw.githubusercontent.com/shyiko/jabba/refs/heads/master/index.json';
+        const wizardContainer = document.getElementById('wizard-container');
+        const stepsWrapper = document.getElementById('wizard-steps-wrapper');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const errorMessageDiv = document.getElementById('error-message');
+
+        const state = {
+            jdkData: null,
+            currentStep: 0,
+            selectedOS: null,
+            selectedArch: null,
+            selectedDist: null, // Will store the original key like 'jdk@zulu'
+            selectedVersion: null,
+            downloadUrl: null
+        };
+
+        function showError(message) {
+            console.error("Wizard Error:", message); // Log error for debugging
+            errorMessageDiv.textContent = message;
+            errorMessageDiv.classList.remove('hidden');
+            loadingIndicator.style.display = 'none'; // Ensure loader is hidden
+        }
+
+        function hideError() {
+            errorMessageDiv.classList.add('hidden');
+            errorMessageDiv.textContent = '';
+        }
+
+        function updateProgressIndicators() {
+            // Update step indicators
+            for (let i = 0; i < 5; i++) {
+                const indicator = document.getElementById(`step-indicator-${i}`);
+                if (i === state.currentStep) {
+                    indicator.classList.add('active');
+                } else {
+                    indicator.classList.remove('active');
+                }
+            }
+        }
+
+        async function init() {
+            try {
+                updateProgressIndicators();
+                const response = await fetch(jdkDataUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status} ${response.statusText}`);
+                }
+                state.jdkData = await response.json();
+                console.log("JDK Data Loaded:", state.jdkData); // Log loaded data
+                loadingIndicator.style.display = 'none';
+                renderStep(state.currentStep);
+            } catch (error) {
+                showError(`Failed to load JDK options. Please check your network connection or try again later. [${error.message}]`);
+            }
+        }
+
+        function renderStep(stepIndex) {
+            console.log(`Rendering step: ${stepIndex}`);
+            hideError(); // Hide any previous errors
+            document.querySelectorAll('.step-container').forEach(el => el.classList.remove('active'));
+            updateProgressIndicators();
+
+            const currentStepElement = document.getElementById(`step-${stepIndex}`);
+            if (!currentStepElement) {
+                showError(`Wizard error: Could not find display area for step ${stepIndex + 1}.`);
+                return;
+            }
+
+            // Populate options based on the step and current state
+            try {
+                switch (stepIndex) {
+                    case 0: // OS
+                        populateOptions('os-options', Object.keys(state.jdkData || {}), handleSelection, 'os');
+                        break;
+                    case 1: // Arch
+                        if (!state.selectedOS || !state.jdkData[state.selectedOS]) {
+                             throw new Error(`Invalid state: OS '${state.selectedOS}' not found in data.`);
+                        }
+                        populateOptions('arch-options', Object.keys(state.jdkData[state.selectedOS]), handleSelection, 'arch');
+                        break;
+                    case 2: // Distribution
+                        if (!state.selectedOS || !state.selectedArch || !state.jdkData[state.selectedOS]?.[state.selectedArch]) {
+                            throw new Error(`Invalid state: Path OS='${state.selectedOS}', Arch='${state.selectedArch}' not found.`);
+                        }
+                        const dists = Object.keys(state.jdkData[state.selectedOS][state.selectedArch]);
+                        populateOptions('dist-options', dists, handleSelection, 'dist', cleanDistName);
+                        break;
+                    case 3: // Version
+                        if (!state.selectedOS || !state.selectedArch || !state.selectedDist || !state.jdkData[state.selectedOS]?.[state.selectedArch]?.[state.selectedDist]) {
+                           throw new Error(`Invalid state: Path OS='${state.selectedOS}', Arch='${state.selectedArch}', Dist='${state.selectedDist}' not found.`);
+                        }
+                        const versions = Object.keys(state.jdkData[state.selectedOS][state.selectedArch][state.selectedDist]);
+                        // Sort versions (simple reverse lexicographical sort)
+                        const sortedVersions = versions.sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
+                        populateOptions('version-options', sortedVersions, handleSelection, 'version');
+                        break;
+                    case 4: // Download Summary
+                        displaySummary();
+                        break;
+                }
+            } catch (error) {
+                showError(`Error preparing step ${stepIndex + 1}: ${error.message}`);
+                // Attempt to safely go back if possible
+                if (stepIndex > 0) {
+                    goBack(stepIndex - 1);
+                }
+                return; // Stop rendering this step
+            }
+
+            currentStepElement.classList.add('active');
+        }
+
+        function populateOptions(containerId, options, clickHandler, type, displayFormatter = null) {
+            const container = document.getElementById(containerId);
+             if (!container) {
+                 console.error(`Container element #${containerId} not found!`);
+                 showError(`Wizard error: Cannot display options for ${type}.`);
+                 return;
+             }
+            container.innerHTML = ''; // Clear previous options
+
+            if (!options || options.length === 0) {
+                 container.innerHTML = `<p class="text-gray-500 text-center col-span-full italic p-4">No options available for this selection.</p>`;
+                 return; // Don't proceed if no options
+            }
+
+            if (type === 'version') {
+                // For versions, use compact cards
+                options.forEach(optionValue => {
+                    const button = document.createElement('button');
+                    button.className = 'option-card px-3 py-2 text-sm font-medium text-center w-full hover:text-white text-gray-200 focus:outline-none macos-focus';
+                    button.textContent = optionValue;
+                    button.dataset.value = optionValue;
+                    button.onclick = (event) => {
+                        event.preventDefault();
+                        // Remove selected class from all buttons
+                        container.querySelectorAll('.option-card').forEach(btn => btn.classList.remove('selected'));
+                        // Add selected class to this button
+                        button.classList.add('selected');
+                        clickHandler(type, optionValue);
+                    };
+                    container.appendChild(button);
+                });
+            } else {
+                // For other options, use more prominent buttons
+                options.forEach(optionValue => {
+                    const button = document.createElement('button');
+                    button.className = 'option-card px-5 py-3 text-sm font-medium text-center hover:text-white text-gray-200 focus:outline-none macos-focus';
+                    button.textContent = displayFormatter ? displayFormatter(optionValue) : optionValue;
+                    button.dataset.value = optionValue;
+                    button.onclick = (event) => {
+                        event.preventDefault();
+                        // Remove selected class from all buttons
+                        container.querySelectorAll('.option-card').forEach(btn => btn.classList.remove('selected'));
+                        // Add selected class to this button
+                        button.classList.add('selected');
+                        clickHandler(type, optionValue);
+                    };
+                    container.appendChild(button);
+                });
+            }
+        }
+
+         function handleSelection(type, value) {
+            console.log(`Selected ${type}: ${value}`);
+            // Update state based on the type of selection
+            switch(type) {
+                case 'os': state.selectedOS = value; break;
+                case 'arch': state.selectedArch = value; break;
+                case 'dist': state.selectedDist = value; break; // Store the original key
+                case 'version': state.selectedVersion = value; break;
+            }
+
+            // If selecting version, find and clean the download URL
+            if (type === 'version') {
+                try {
+                    const rawUrl = state.jdkData[state.selectedOS][state.selectedArch][state.selectedDist][state.selectedVersion];
+                    if (!rawUrl || typeof rawUrl !== 'string') {
+                         throw new Error('Download URL not found or invalid in data.');
+                    }
+                     // Remove prefix like zip+, tgz+, ia+, etc. if present
+                     const plusIndex = rawUrl.indexOf('+');
+                    state.downloadUrl = plusIndex !== -1 ? rawUrl.substring(plusIndex + 1) : rawUrl; // Handle cases with no prefix
+                     console.log(`Download URL set: ${state.downloadUrl}`);
+                } catch (error) {
+                     showError(`Error getting download URL: ${error.message}`);
+                     // Don't advance if URL failed
+                     return;
+                }
+            }
+
+            state.currentStep++;
+            renderStep(state.currentStep);
+        }
+
+        function displaySummary() {
+             try {
+                document.getElementById('summary-os').textContent = state.selectedOS || 'N/A';
+                document.getElementById('summary-arch').textContent = state.selectedArch || 'N/A';
+                document.getElementById('summary-dist').textContent = state.selectedDist ? cleanDistName(state.selectedDist) : 'N/A';
+                document.getElementById('summary-version').textContent = state.selectedVersion || 'N/A';
+
+                const downloadLink = document.getElementById('download-link');
+                if (state.downloadUrl) {
+                    downloadLink.href = state.downloadUrl;
+                    downloadLink.classList.remove('opacity-50', 'cursor-not-allowed');
+                } else {
+                    downloadLink.href = '#';
+                    downloadLink.classList.add('opacity-50', 'cursor-not-allowed');
+                    showError("Download link could not be generated. Please go back and reselect.");
+                }
+            } catch (error) {
+                 showError(`Error displaying summary: ${error.message}`);
+            }
+        }
+
+         function goBack(targetStep) {
+             console.log(`Going back to step: ${targetStep}`);
+             // Reset state properties for steps *after* the target step
+             if (targetStep < 4) { state.selectedVersion = null; state.downloadUrl = null; }
+             if (targetStep < 3) { state.selectedDist = null; }
+             if (targetStep < 2) { state.selectedArch = null; }
+             if (targetStep < 1) { state.selectedOS = null; }
+
+             // Update current step and render
+             state.currentStep = targetStep;
+             renderStep(targetStep);
+         }
+
+         // Utility function to make distribution names more readable
+         function cleanDistName(dist) {
+             if (!dist) return '';
+             
+             // Remove 'jdk@' prefix if present
+             let name = dist.replace(/^jdk@/, '');
+             
+             // Capitalize first letter and common acronyms
+             name = name.replace(/^(.)/, match => match.toUpperCase())
+                       .replace(/\bjdk\b/gi, 'JDK')
+                       .replace(/\bopenjdk\b/gi, 'OpenJDK')
+                       .replace(/\bgrl\b/gi, 'GraalVM');
+                       
+             return name;
+         }
+
+         // Start the wizard
+         init();
+     </script>
+</body>
+</html>
